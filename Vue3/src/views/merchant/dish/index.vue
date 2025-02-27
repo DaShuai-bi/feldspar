@@ -69,9 +69,14 @@
 
     <el-table v-loading="loading" :data="dishList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="主键" align="center" prop="id" />
+      <!-- <el-table-column label="主键" align="center" prop="id" /> -->
       <el-table-column label="菜品名称" align="center" prop="name" />
-      <el-table-column label="售价" align="center" prop="price" />
+      <el-table-column label="售价" align="center">
+        <template #default="scope">
+          <span>￥{{ scope.row.price }}</span>
+        </template>
+      </el-table-column>
+  
       <el-table-column label="图片" align="center" prop="image" width="100">
         <template #default="scope">
           <image-preview :src="scope.row.image" :width="50" :height="50"/>
@@ -84,7 +89,7 @@
       </el-table-column>
       <el-table-column label="更新时间" align="center" prop="updateTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.updateTime, '{y}-{m}-{d}') }}</span>
+          <span>{{ parseTime(scope.row.updateTime, '{y}-{m}-{d} {h}:{i}') }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
@@ -142,12 +147,35 @@
           <el-table-column label="序号" align="center" prop="index" width="50"/>
           <el-table-column label="口味名称" prop="name" width="150">
             <template #default="scope">
-              <el-input v-model="scope.row.name" placeholder="请输入口味名称" />
+              <!-- <el-input v-model="scope.row.name" placeholder="请输入口味名称" /> -->
+              <el-select v-model="scope.row.name" placeholder="请选择口味名称"
+              @change="changeFlavorName(scope.row)">
+                <el-option
+                  v-for="dishFlavor in dishFlavorListSelect"
+                  :key="dishFlavor.name"
+                  :label="dishFlavor.name"
+                  :value="dishFlavor.name"
+                  />
+              </el-select>
+
             </template>
           </el-table-column>
           <el-table-column label="口味列表" prop="value" width="150">
             <template #default="scope">
-              <el-input v-model="scope.row.value" placeholder="请输入口味列表" />
+              <!-- <el-input v-model="scope.row.value" placeholder="请输入口味列表" /> -->
+              <el-select v-model="scope.row.value" placeholder="请选择口味列表" multiple
+              @focus="focusFlavorName(scope.row)">
+                <el-option
+                  v-for="value in checkValueList"
+                  :key="value"
+                  :label="value"
+                  :value="value"
+                  />
+              </el-select>
+
+
+
+
             </template>
           </el-table-column>
         </el-table>
@@ -205,6 +233,29 @@ const data = reactive({
 });
 
 const { queryParams, form, rules } = toRefs(data);
+
+// 定位口味名称和口味列表的静态数据
+const dishFlavorListSelect = ref([
+  {name:"辣度",value:["微辣","中辣","重辣"]},
+  {name:"忌口",value:["不要葱","不要蒜","不要香菜"]},
+  {name:"甜味",value:["无糖","少糖","半糖","多糖"]},
+])
+
+//存储当前选中口味列表数组
+const checkValueList= ref([])
+//定义改变口味名称时更新当前选中的口味列表
+function changeFlavorName(row){
+  //清空当前行的value
+  row.value = [];
+  //根据选中的name去查找静态数据的value
+  checkValueList.value = dishFlavorListSelect.value.find(item => item.name == row.name).value
+}
+
+//定义口味列表获取焦点时更新当前选中的口味列表
+function focusFlavorName(row){
+  //根据选中的name去查找静态数据的value
+  checkValueList.value = dishFlavorListSelect.value.find(item => item.name == row.name).value
+}
 
 /** 查询菜品管理列表 */
 function getList() {
@@ -271,6 +322,13 @@ function handleUpdate(row) {
   getDish(_id).then(response => {
     form.value = response.data;
     dishFlavorList.value = response.data.dishFlavorList;
+    //将口味列表的value字符串转换为json数组
+    if(form.value.dishFlavorList!=null){
+      dishFlavorList.value.forEach(item => {
+      item.value = JSON.parse(item.value);
+    });
+    }
+
     open.value = true;
     title.value = "修改菜品管理";
   });
@@ -281,6 +339,14 @@ function submitForm() {
   proxy.$refs["dishRef"].validate(valid => {
     if (valid) {
       form.value.dishFlavorList = dishFlavorList.value;
+      //将口味列表中的value通过json工具转换为字符串
+      if(form.value.dishFlavorList!=null){
+        form.value.dishFlavorList.forEach(item => {
+        item.value = JSON.stringify(item.value);
+      })
+      }
+
+
       if (form.value.id != null) {
         updateDish(form.value).then(response => {
           proxy.$modal.msgSuccess("修改成功");
